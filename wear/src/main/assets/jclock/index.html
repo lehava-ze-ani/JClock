@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="utf-8">
+    <base href="./">
+    <title>קידוש החודש</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="application-name" content="קידוש החודש">
+    <meta name="apple-mobile-web-app-title" content="קידוש החודש">
+    <meta property="og:title" content="קידוש החודש">
+    <link rel="stylesheet" type="text/css" href="css/stylesheet.css" id="thecss">   
+    <link rel="stylesheet" type="text/css" href="css/progressBar.css" id="thecss">   
+    <link rel="stylesheet" type="text/css" href="./windows.css?v=20260710-time-slider">
+	<link rel="shortcut icon" type="image/x-icon" href="./hebrewclock.png" />
+</head>
+
+<body id="hebrewClock">
+    <main class="windows-desktop" aria-label="קידוש החודש">
+      <section class="toolbar-window" aria-label="קידוש החודש">
+        <div class="window-grip" aria-hidden="true"></div>
+        <div id="sun-line" class="clock-line">
+          <span class="clock-label">חמה</span>
+          <span id="sun-time" class="clock-value">--:----:--</span>
+          <span id="sun-mazal" class="clock-mazal">--</span>
+        </div>
+        <div class="date-row">
+          <button id="current-location" class="mode-button" type="button">מקומי</button>
+          <button id="date-orbit" class="orbit-button" type="button" aria-label="תאריך עברי">
+            <span id="orbit-sun-radius" class="orbit-radius sun-radius" aria-hidden="true"></span>
+            <span id="orbit-moon-radius" class="orbit-radius moon-radius" aria-hidden="true"></span>
+            <span id="orbit-sun" class="orbit-dot sun-dot" aria-hidden="true"></span>
+            <span id="orbit-moon" class="orbit-dot moon-dot" aria-hidden="true"></span>
+            <span id="hebrew-date">--/--/----</span>
+          </button>
+          <button id="hidden-starr-open" class="mode-button hidden-button" type="button" hidden aria-hidden="true">Hidden</button>
+          <button id="jerusalem" class="mode-button active" type="button">ירושלים</button>
+        </div>
+        <div id="moon-line" class="clock-line">
+          <span class="clock-label">לבנה</span>
+          <span id="moon-time" class="clock-value">--:----:--</span>
+          <span id="moon-mazal" class="clock-mazal">--</span>
+        </div>
+      </section>
+      <section class="time-slider-panel" aria-label="בחירת זמן מדומה">
+        <div class="time-slider-scale" aria-hidden="true">
+          <span>+3</span>
+          <output id="time-offset-label" for="time-offset-slider">עכשיו</output>
+          <span>−3</span>
+        </div>
+        <input id="time-offset-slider" class="time-offset-slider" type="range" min="-10800" max="10800" step="300" value="0" aria-label="הזזת הזמן בקפיצות של חמש דקות, משלוש שעות אחורה עד שלוש שעות קדימה">
+        <button id="time-now" class="time-now-button" type="button">עכשיו</button>
+      </section>
+      <section class="system-clock" aria-label="שעון מערכת">
+        <span id="civil-time">--:--</span>
+        <span id="civil-date">--/--/----</span>
+      </section>
+      <div class="jclock-music-controls">
+        <a id="jclock-whatsapp-learning" class="jclock-whatsapp-learning" href="https://wa.me/972587401735" target="_blank" rel="noopener noreferrer">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3.5a8.5 8.5 0 0 0-7.2 13l-.9 3.6 3.7-.9A8.5 8.5 0 1 0 12 3.5Z"></path>
+            <path d="M8.9 8.2c.2-.5.4-.5.7-.5h.5c.2 0 .4.1.5.4l.7 1.6c.1.3 0 .5-.1.7l-.4.5c.7 1.2 1.7 2.1 3 2.7l.5-.6c.2-.2.4-.3.7-.2l1.6.7c.3.1.4.3.4.6 0 .8-.7 1.5-1.5 1.6-2.3.1-6.8-2.1-7.7-6.3-.1-.5.2-.9.6-1.2Z"></path>
+          </svg>
+          <span>אמן שרוצה ללמוד איך לנגן ניגון מכוון? דברו איתי ב־WhatsApp</span>
+        </a>
+        <div id="jclock-music-progress" class="jclock-music-progress" role="status" aria-live="polite" hidden>
+          <div class="jclock-music-progress-row">
+            <span id="jclock-music-progress-label">טוען שיר</span>
+            <span id="jclock-music-progress-value">0%</span>
+          </div>
+          <div id="jclock-music-progress-bar" class="jclock-music-progress-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <span id="jclock-music-progress-fill"></span>
+          </div>
+        </div>
+        <div class="jclock-volume-control" title="Music volume">
+          <button id="jclock-import-wav" class="jclock-import-wav-button" type="button" title="ייבא WAV" aria-label="ייבא קובץ WAV">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <path d="M17 8 12 3 7 8"></path>
+              <path d="M12 3v12"></path>
+            </svg>
+          </button>
+          <input id="jclock-music-volume" type="range" min="0" max="100" step="1" value="42" aria-label="Music volume">
+          <output id="jclock-music-volume-value" for="jclock-music-volume">42%</output>
+          <input id="jclock-wav-file-input" class="jclock-wav-file-input" type="file" accept=".wav,audio/wav,audio/wave,audio/x-wav,audio/vnd.wave" multiple hidden aria-hidden="true">
+        </div>
+      </div>
+      <section id="hidden-starr-panel" class="hidden-starr-panel" hidden aria-label="HiddenStarr">
+        <div class="hidden-starr-shell" role="dialog" aria-modal="true" aria-labelledby="hidden-starr-title">
+          <header class="hidden-starr-header">
+            <div class="hidden-starr-heading">
+              <h1 id="hidden-starr-title">HiddenStarr</h1>
+              <p>הדברים שאנשים הכי צריכים לפעמים נמצאים במקומות הכי נסתרים<span>השרטוט נקרא כאן מגן דוד מפני ששני המשולשים נוצרים דווקא דרך הדילוגים: כסלו, שבט ואדר מדלגים על טבת, חודש מזלם של ישראל; וניסן, אייר ותמוז מדלגים על סיוון, חודש פטירת דוד המלך. המקומות שאיננו רואים, אלה שנעשים שקופים בעינינו, מזכירים גם את מי שמכונים לפעמים משוגע.ת ומתמודדים עם מאניה, סכיזופרניה או מצוקה נפשית, כמוני, המחבר, נפתלי ביליג. דווקא החסר יוצר השלמה.</span></p>
+            </div>
+            <label class="hidden-starr-year-picker">
+              <span>שנה מיוצגת</span>
+              <select id="hidden-starr-year"></select>
+            </label>
+            <button id="hidden-starr-close" class="hidden-starr-close" type="button" aria-label="סגור">&times;</button>
+          </header>
+          <div id="hidden-starr-network" class="hidden-starr-network" aria-live="polite"></div>
+          <div id="hidden-starr-legend" class="hidden-starr-legend"></div>
+          <div class="hidden-starr-footer">
+            <span class="hidden-starr-heart" aria-hidden="true">♥</span>
+            <span class="hidden-starr-footer-text">
+              <b>מתנה ליום הנישואים ה-12, תודה</b>
+              <span>חנה, את זוכרת את המגן דוד שהבאתי לך לאירוסין בחוף הצוק, עם סדין מסבתא רבקה שעוד מעט בת 100 כבר? אני לא בטוח שאת זוכרת, אבל זה מה שהיה. אז מצאתי אותו.</span>
+            </span>
+          </div>
+        </div>
+      </section>
+    </main>
+	<!-- The core Firebase JS SDK is always required and must be listed first--> 
+	<script src="https://www.gstatic.com/firebasejs/8.8.0/firebase-app.js"></script>
+
+	<!-- TODO: Add SDKs for Firebase products that you want to use
+		 https://firebase.google.com/docs/web/setup#available-libraries --> 
+	<script src="https://www.gstatic.com/firebasejs/8.8.0/firebase-analytics.js"></script>	
+	
+	<script>
+		// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+		const firebaseConfig = {
+		  apiKey: "AIzaSyC_o6BkcBq_KHMuNWJU0try__AUjw9IHfk",
+		  authDomain: "hebrewclock13.firebaseapp.com",
+		  projectId: "hebrewclock13",
+		  storageBucket: "hebrewclock13.appspot.com",
+		  messagingSenderId: "284970515106",
+		  appId: "1:284970515106:web:15952320f357f3582575fb",
+		  measurementId: "G-GRQJVJC2E0"
+		};
+		// Initialize Firebase.
+		firebase.initializeApp(firebaseConfig);
+
+		// Initialize Firebase Analytics.
+		firebase.analytics().logEvent('שעון עברי');
+	</script>
+	
+    <div id="container" ondblclick="pause()">
+		<div style = "text-align:center; margin-bottom:10px; ">
+            <table style="width:850px;">
+                <input class ="ChirstianClock" id="ChirstianHour" type="text" value="11" /> <!--onclick="House4You()";/>-->
+                <input class ="ChirstianClock" id="Text2" type="text" value=":" onclick="yovelMazalCalculator();"/>
+                <input class ="ChirstianClock" id="ChirstianMinute" type="text" value="59" /><!--onclick="Tefila();"/>-->
+                <input class ="ChirstianClock" id="Text4" type="text" value=":" onclick="yovelMazalCalculator();"/>
+                <input class ="ChirstianClock" id="ChirstianSecond" type="text"  value="59" /><!--onclick="yovelMazalCalculator();"//>-->
+            </table>
+            <table style="width:850px;">
+                    <input class ="clock" id="Hour" type="text" value = "11" onclick="openSpecialHebrewClock();" />
+                    <input class ="clock" id="HebrewText2" type="text" value = ":" onclick="openSpecialHebrewGiving();" />
+                    <input class ="clock" id="Minute" type="text" value = "1079" onclick="openSpecialChristianClock();"/><!--onclick="openSpecialChristianClock();"/>-->
+                    <input class ="clock" id="HebrewText4" type="text" value = ":" onclick="openSpecialHebrewGiving();"/>
+                    <input class ="clock" id="Second" type="text" value = "75" onclick="openSpecialHebrewClock();"/><!--onclick="openSpecialMuslimClock();"-->
+            </table>
+            <div>
+			<div>
+				<center>
+				<div> 
+					<a id="Mazal" style="cursor:pointer; text-decoration: unset;" onclick="openSederLimud();"></a>
+				</div>
+				<div class="circular" style="display:none";>
+					<div class="inner"></div>
+					<div class="number">ברכות השחר</div>
+					<div class="circle">
+						<div class="bar left">
+							<div class="progress"></div>
+						</div>
+						<div class="bar right">
+							<div class="progress"></div>
+						</div>
+					</div>
+				</div>
+				</center>
+			</div>
+			</div>
+			<br>			
+        </div>		
+    </div>
+
+	<script type="text/javascript" src="js/suncalc.js"></script>
+ <!--   <script type="text/javascript" src="../../shared/he/js/Commercial.js"></script>-->
+	<script type="text/javascript" src="js/man/HebrewClock.js"></script>
+	<script type="text/javascript" src="js/man/Mazal.js"></script>
+	<script type="text/javascript" src="js/man/Times.js"></script>
+	<script type="text/javascript" src="js/HebrewDayOffset.js"></script>
+	<script type="text/javascript" src="js/Geolocation.js"></script>
+    <script type="text/javascript" src="js/SunAlert.js"></script>
+	<script type="text/javascript" src="js/HebrewDate.js"></script>
+    <script type="text/javascript" src="js/HebrewClock.js"></script>
+	<script type="text/javascript" src="js/Times.js"></script>
+    <script type="text/javascript" src="js/SunTime.js"></script>
+    <script type="text/javascript" src="js/TimeAdj.js"></script>
+    <script type="text/javascript" src="js/Dst.js"></script>
+    <script type="text/javascript" src="js/Dates.js"></script>
+    <script type="text/javascript" src="js/Location.js"></script>
+    <script type="text/javascript" src="js/Mazal.js"></script>
+	<script type="text/javascript" src="js/Tefila.js"></script>
+
+    
+<script type="text/javascript">
+
+    //public variables
+    var longitude, latitude;  //current geo location
+	var birthYear,birthMonth,birthDay,birthGMT,birthHour,birthMin,birthSec,birthMs; //get birth time
+	var defaultLongitude = 35.2331664;
+	var defaultLatitude = 31.7768514;
+	
+    var latd = -1, latm = 0;  // lat on earth
+    var lngd = -1, lngm = 0;  // long on earth
+    var lat = 0, lng = 0;     // sun's location
+
+    var ns,ew;              // hemisphere
+    var dst; 	            // daylight saving time
+    var ampm = false; 	    // am/pm or 24 hour display
+
+    var monCount = [13, 1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366];
+    var flag = false;
+
+    var sunsetH;
+    var sunsetM;
+    var sunsetS;
+
+	var sunsetH_man;
+	var sunsetM_man;
+	var sunsetS_man;
+	var sunsetMili_man;
+
+    var tz = (new Date().getTimezoneOffset() / -60); //current time zone
+
+    var month, day, year;       //curren date
+
+    var shaa_zmanit_night = 1;
+    var shaa_zmanit_day = 1;
+	
+	var milisec_shaa_zmanit_night = 1000;
+    var milisec_shaa_zmanit_day = 1000;
+
+    var oTimer;                 //event for the running clock
+
+    var hebrewday;
+	var hebrewday_man;
+    var lbHour = 23;           //hour of the clock called also sha'a
+    var lbMinute = 1075;       //minute of the clock called also chelek
+    var lbSecond = 70;         //second of the clock called also re'ga
+    var audio;
+
+	var lbHour4Man;
+	var lbMinute4Man;
+	var lbSecond4Man;
+
+	//pray variables
+	var dawn;  			// 1.2 zmanit hour before sunrise 	 --  זמן קריאת שמע של שחרית 
+	var misheyakir;
+	var tzeit;
+	var sunset;
+	
+/*1*/ var tzitzit =14;			// 55 zmanit  minutes before sunrise -- ציצית
+/*2*/ var birkutHashahar; // 42 regular minutes before sunrise -- ברכות השחר  
+/*3*/ var patachEliyaou;  // 38 regular minutes before sunrise -- פתח אליהו
+/*4*/ var korbanot;		// 35 regular minutes before sunrise -- קורבנות
+/*5*/ var psokeiDzimra;	// 22 regular minutes before sunrise -- פסוקי דזמרה
+/*6*/ var YozerOr;		// 08 regular minutes before sunrise -- יוצר אור
+/*7*/ var kriyahtShema;	// 04 regular minutes before sunrise -- קריאת שמע
+      var publicSunrise; //זריחה
+
+    // The Windows-style shell drives the clock; the legacy DOM remains as a calculation bridge.
+
+    //---get Location and activate the clock---
+    function getLocation()
+    {
+		var url = new URL(document.location.href);
+        var lon = url.searchParams.get("longitude");        
+        var lat = url.searchParams.get("latitude");
+		birthYear = url.searchParams.get("year");
+		birthMonth = url.searchParams.get("month");
+		birthDay = url.searchParams.get("day");
+		birthHour = url.searchParams.get("hour");
+		birthMin = url.searchParams.get("min");
+		birthSec = url.searchParams.get("sec");
+		birthMs = url.searchParams.get("ms");
+		birthGMT = url.searchParams.get("gmt");
+	
+		longitude = lon ? lon : defaultLongitude;
+		latitude = lat ? lat : defaultLatitude;
+
+		set_dst();
+		set_default_date();
+		list_pos();
+		hebrewclock();
+		oTimerclock();
+		setmazal();
+    }
+  
+    function showPosition(position)
+    {
+        var url = new URL(document.location.href);
+        var lon = url.searchParams.get("longitude");        
+        var lat = url.searchParams.get("latitude");
+		
+		birthYear = url.searchParams.get("year");
+		birthMonth = url.searchParams.get("month");
+		birthDay = url.searchParams.get("day");
+		birthHour = url.searchParams.get("hour");
+		birthMin = url.searchParams.get("min");
+		birthSec = url.searchParams.get("sec");
+		birthMs = url.searchParams.get("ms");
+		birthGMT = url.searchParams.get("gmt");
+		//tz = birthGMT;
+		
+        if(lat)
+        {
+            //tz = https://maps.googleapis.com/maps/api/timezone/outputFormat?parameters
+        }
+		//if(birthHour)
+		//	document.getElementById("Mazal").style.display = "none";
+
+        longitude = lon ? lon : position.coords.longitude;
+        latitude = lat ? lat : position.coords.latitude; 
+
+        set_dst();
+        set_default_date();
+        list_pos();
+        hebrewclock();
+        oTimerclock();
+        setmazal();
+    }
+	
+	function openSpecialHebrewGiving()
+	{
+        //return;
+        var userLang = navigator.language || navigator.userLanguage; 
+        if (userLang = "he") 
+            window.location.href = "../mahasrot/he/index.html";
+        else
+            window.location.href = "../mahasrot/en/index.html";		
+	}
+	
+    function openSpecialHebrewClock()
+    {
+		var url = new URL(document.location.href);
+        var queryString = getClockQueryString(url);
+		
+        var userLang = navigator.language || navigator.userLanguage; 
+		if (userLang.includes("he"))
+		{
+			window.location.href = "../me/he/kabala/index.html" + queryString;
+		}
+		else
+		{
+			window.location.href = "../me/en/kabala/index.html" + queryString;
+		}
+    }
+    
+    function openSpecialMuslimClock()
+    {
+        var userLang = navigator.language || navigator.userLanguage; 
+        if (userLang = "he") 
+            window.location.href = "../is/he/kabala/index.html";
+        else
+            window.location.href = "../is/en/kabala/index.html";
+    }
+
+    function openSpecialChristianClock()
+    {
+		var url = new URL(document.location.href);
+        var queryString = getClockQueryString(url);
+		
+        var userLang = navigator.language || navigator.userLanguage; 
+		if (userLang.includes("he"))
+		{
+			window.location.href = "../it/he/kabala/index.html" + queryString;
+		}
+		else
+		{
+			window.location.href = "../it/en/kabala/index.html" + queryString;
+		}	
+    }
+
+	function getClockQueryString(url)
+	{
+		var date = new Date();
+		var hour = birthHour == null ? date.getHours() : birthHour;
+		var min = birthMin == null ? date.getMinutes() : birthMin;
+		var sec = birthSec == null ? date.getSeconds() : birthSec;
+		var ms = birthMs == null ? date.getMilliseconds() : birthMs;
+		var year = birthYear == null ? date.getFullYear() : birthYear;
+		var month = birthMonth == null ? date.getMonth() + 1 : birthMonth;
+		var day = birthDay == null ? date.getDate() : birthDay;
+		var gmt = birthGMT == null ? (new Date().getTimezoneOffset() / -60) : birthGMT;
+		var params = new URLSearchParams(url.search);
+		if(!params.get("latitude"))
+			params.set("latitude", latitude);
+		if(!params.get("longitude"))
+			params.set("longitude", longitude);
+		if(!params.get("hour"))
+			params.set("hour", hour);
+		if(!params.get("min"))
+			params.set("min", min);
+		if(!params.get("sec"))
+			params.set("sec", sec);
+		if(!params.get("ms"))
+			params.set("ms", ms);
+		if(!params.get("year"))
+			params.set("year", year);
+		if(!params.get("month"))
+			params.set("month", month);
+		if(!params.get("day"))
+			params.set("day", day);
+		if(!params.get("gmt"))
+			params.set("gmt", gmt);
+		params.set("live", "1");
+		params.set("liveStart", Date.now());
+		return "?" + params.toString();
+	}
+	
+	function yovelMazalCalculator()
+	{
+        var userLang = navigator.language || navigator.userLanguage; 
+        if (userLang = "he") 
+            window.location.href = "../yovelMazalCalculator/he/index.html";
+        else
+            window.location.href = "../yovelMazalCalculator/en/index.html";
+	
+	}
+
+	function House4You()
+	{
+		//var url = new URL(document.location.href);
+		//var selfShevet = url.searchParams.get("selfShevet");        
+		//window.location.href = "../house4You/index.html?selfShevet=" + selfShevet;
+			
+		if(birthHour)
+		{
+			var userLang = navigator.language || navigator.userLanguage; 
+			var mazalHebrewDay = getMazalHebrewDay();
+			if (userLang = "he") 
+				window.location.href = "../me/he/index.html?hebrewDay="+ mazalHebrewDay +"&hebrewHour=" + Number(lbHour+1);
+			else
+				window.location.href = "../me/en/index.html?hebrewDay="+ mazalHebrewDay +"&hebrewHour=" + Number(lbHour+1);		
+		}
+	}
+	
+	function openSederLimud()
+	{
+		let isPersonalMazal = "&period=personal";
+		var url = new URL(document.location.href);
+		if(url.searchParams.get("hour") == null)
+			isPersonalMazal = "";
+
+        var lon = url.searchParams.get("longitude");        
+        var lat = url.searchParams.get("latitude");
+		var location = lon ? "&latitude=" + lat + "&longitude=" + lon : "";
+		var mazalHebrewDay = getMazalHebrewDay();
+        var userLang = navigator.language || navigator.userLanguage; 
+        if (userLang.includes("he")) 
+            window.location.href = "../me/he/index.html?hebrewDay="+ mazalHebrewDay +"&hebrewHour=" + Number(lbHour+1) + isPersonalMazal + location;
+        else
+            window.location.href = "../me/en/index.html?hebrewDay="+ mazalHebrewDay +"&hebrewHour=" + Number(lbHour+1) + isPersonalMazal + location;	
+	}
+    </script>
+
+    <script type="text/javascript" src="./windows-app.js?v=20260710-time-slider"></script>
+    <script type="text/javascript" src="./hidden-starr.js?v=20260708-wide-orbit2"></script>
+    <script type="module" src="./jclock-music.js?v=20260709-audio3"></script>
+</body>
+</html>
