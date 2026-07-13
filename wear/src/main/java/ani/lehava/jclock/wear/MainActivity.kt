@@ -67,11 +67,13 @@ class MainActivity : Activity() {
     }
 
     private fun openLearningOnPhone(epoch: Long, zoneId: String) {
-        val instant = Instant.ofEpochMilli(epoch).atZone(ZoneId.of(zoneId))
+        val jerusalemZone = ZoneId.of("Asia/Jerusalem")
+        val instant = Instant.ofEpochMilli(epoch).atZone(jerusalemZone)
         val body = JSONObject()
             .put("date", instant.toLocalDate().toString())
             .put("time", "%02d:%02d".format(Locale.US, instant.hour, instant.minute))
-            .put("timeZone", zoneId)
+            .put("timeZone", jerusalemZone.id)
+            .put("sourceTimeZone", zoneId)
             .toString().toByteArray(Charsets.UTF_8)
         Wearable.getNodeClient(this).connectedNodes.addOnSuccessListener { nodes ->
             if (nodes.isEmpty()) face.showStatus("אין טלפון מחובר")

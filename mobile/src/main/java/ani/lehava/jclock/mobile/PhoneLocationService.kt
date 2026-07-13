@@ -14,6 +14,10 @@ import org.json.JSONObject
 import java.util.TimeZone
 
 class PhoneLocationService : WearableListenerService() {
+    private companion object {
+        const val EMAIL_RECIPIENT = "kidush.lavana007@gmail.com"
+    }
+
     override fun onMessageReceived(event: MessageEvent) {
         if (event.path == "/jclock/learning/open") {
             val body = runCatching { JSONObject(String(event.data, Charsets.UTF_8)) }.getOrNull() ?: return
@@ -23,7 +27,12 @@ class PhoneLocationService : WearableListenerService() {
                 .appendQueryParameter("timeZone", body.optString("timeZone"))
                 .appendQueryParameter("auto", "1")
                 .build()
-            startActivity(Intent(Intent.ACTION_VIEW, url).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            val email = Uri.parse("mailto:").buildUpon()
+                .appendQueryParameter("to", EMAIL_RECIPIENT)
+                .appendQueryParameter("subject", "JClock - חישוב מולד")
+                .appendQueryParameter("body", url.toString())
+                .build()
+            startActivity(Intent(Intent.ACTION_SENDTO, email).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             return
         }
         if (event.path != "/jclock/location/request") return
