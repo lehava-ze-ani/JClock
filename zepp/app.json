@@ -1,0 +1,53 @@
+{
+  "configVersion": "v3",
+  "app": {
+    "appId": 1094762,
+    "appName": "JClock",
+    "appType": "app",
+    "version": { "code": 10, "name": "0.3.7" },
+    "icon": "icon.png",
+    "vender": "Naftali Belig",
+    "description": "JClock - Hebrew solar and lunar time"
+  },
+  "runtime": {
+    "apiVersion": { "minVersion": "2.0.0", "target": "3.0.0", "compatible": "2.0.0" },
+    "type": 0
+  },
+  "permissions": ["data:os.device.info"],
+  "targets": {
+    "cheetah-round": {
+      "module": {
+        "page": { "pages": ["page/index"] },
+        "app-side": { "path": "app-side/index" }
+      },
+      "platforms": [
+        { "name": "Amazfit Cheetah Round CN", "deviceSource": 8192256 },
+        { "name": "Amazfit Cheetah Round", "deviceSource": 8192257 }
+      ],
+      "designWidth": 454
+    },
+    "cheetah-square": {
+      "module": {
+        "page": { "pages": ["page/index"] },
+        "app-side": { "path": "app-side/index" }
+      },
+      "platforms": [
+        { "name": "Amazfit Cheetah Square", "deviceSource": 8257793 }
+      ],
+      "designWidth": 390
+    },
+    "cheetah-pro": {
+      "module": {
+        "page": { "pages": ["page/index"] },
+        "app-side": { "path": "app-side/index" }
+      },
+      "platforms": [
+        { "name": "Amazfit Cheetah Pro CN", "deviceSource": 8126720 },
+        { "name": "Amazfit Cheetah Pro", "deviceSource": 8126721 }
+      ],
+      "designWidth": 480
+    }
+  },
+  "i18n": { "en-US": { "appName": "JClock" }, "he-IL": { "appName": "JClock" } },
+  "defaultLanguage": "he-IL"
+}
