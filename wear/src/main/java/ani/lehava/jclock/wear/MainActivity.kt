@@ -97,8 +97,12 @@ class MainActivity : Activity() {
     }
 
     private inner class JClockView : View(this) {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = android.graphics.Typeface.create("sans", 0) }
-        private val bold = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = android.graphics.Typeface.create("sans", 1) }
+        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = android.graphics.Typeface.create("sans", android.graphics.Typeface.NORMAL)
+        }
+        private val bold = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = android.graphics.Typeface.create("sans", android.graphics.Typeface.BOLD)
+        }
         private val tick = object : Runnable { override fun run() { invalidate(); clockHandler.postDelayed(this, 1000) } }
         private var offsetSeconds = 0
         private var localMode = false

@@ -3,7 +3,7 @@ plugins { id("com.android.application"); id("org.jetbrains.kotlin.android") }
 android {
     namespace = "ani.lehava.jclock.mobile"
     compileSdk = 35
-    defaultConfig { applicationId = "ani.lehava.jclock"; minSdk = 26; targetSdk = 35; versionCode = 7; versionName = "0.3.4" }
+    defaultConfig { applicationId = "ani.lehava.jclock"; minSdk = 26; targetSdk = 35; versionCode = 8; versionName = "0.3.5" }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
 

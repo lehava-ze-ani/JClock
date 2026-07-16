@@ -1,0 +1,13 @@
+JClock — Legal notice
+
+Author and documented original developer: Naftali Bilig.
+Copyright (c) 2009-2026 Naftali Bilig. All rights reserved.
+
+An official binary may be installed and run for personal, non-commercial use as distributed. No source-code license, redistribution, modification, reverse engineering, derivative-work or publication permission is granted except where a component license expressly provides otherwise.
+
+Copyright in source code is distinct from patent rights. This notice makes no determination that any patent is valid or invalid and grants no patent license.
+
+Third-party notices include Scott E. Lee (Copyright 1993-1995; permission notice must be retained) and SunCalc by Vladimir Agafonkin (Copyright 2011-2015; BSD). Platform libraries remain subject to their own licenses. Software licensing does not grant rights to music, recordings, images, icons or logos.
+
+Provided AS IS. Full terms and the authorship record are in the JClock companion application's “רישיון וזכויות” screen and in the project LICENSE / THIRD_PARTY_NOTICES.md files.
+

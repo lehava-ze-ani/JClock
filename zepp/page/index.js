@@ -161,7 +161,7 @@ Page({
     })
     // If a later widget or calculation fails, this remains visible and proves
     // that the page itself started instead of leaving an indistinguishable black screen.
-    this.bootLabel = text(null, px(55), px(190), width - px(110), px(74), px(25), 'JClock 0.3.7\nטוען…', GOLD)
+    this.bootLabel = text(null, px(55), px(190), width - px(110), px(74), px(25), 'JClock 0.3.8\nטוען…', GOLD)
     this.mainLayer = createWidget(widget.GROUP, { x: 0, y: 0, w: width, h: height })
     defaultOwner = this.mainLayer
     console.log('[JClock] B02 boot label')
@@ -268,6 +268,7 @@ Page({
     text(this.cover, px(48), px(272), width - px(96), px(62), px(20), 'מה גרם לנו לעצור\nאת השעון?', TEXT)
     this.coverStatus = text(this.cover, px(70), px(368), width - px(140), px(28), px(15), 'נגיעה לפתיחת השעון', GOLD)
     this.coverError = text(this.cover, px(42), px(397), width - px(84), px(24), px(11), '', 0xe05858)
+    text(this.cover, px(48), px(426), width - px(96), px(16), px(10), '© 2009–2026 נפתלי ביליג', MUTED)
     this.mainLayer.setProperty(prop.VISIBLE, false)
     this.orbitGroup.setProperty(prop.VISIBLE, false)
     this.cover.addEventListener(event.CLICK_UP, () => {

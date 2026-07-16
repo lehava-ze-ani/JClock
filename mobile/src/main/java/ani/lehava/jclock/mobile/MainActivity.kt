@@ -1,6 +1,7 @@
 package ani.lehava.jclock.mobile
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.net.Uri
@@ -120,6 +121,7 @@ class MainActivity : ComponentActivity() {
         addLocationSection(layout)
         addMusicSection(layout)
         addUmidSection(layout)
+        addLegalSection(layout)
 
         layout.addView(Button(this).apply {
             text = "פתח יחידת לימוד"
@@ -306,6 +308,43 @@ class MainActivity : ComponentActivity() {
                 startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://birthcalculator.web.app")))
             }
         })
+    }
+
+    private fun addLegalSection(parent: LinearLayout) {
+        parent.addView(sectionTitle("רישיון וזכויות"))
+        parent.addView(TextView(this).apply {
+            text = "המחבר והמפתח המתועד של JClock הוא נפתלי ביליג. " +
+                "זכויות יוצרים בקוד נפרדות משאלת הפטנט; הודעות צד שלישי נשמרות במלואן."
+            textSize = 14f
+            gravity = Gravity.CENTER
+            setPadding(0, dp(4), 0, dp(7))
+        })
+        parent.addView(Button(this).apply {
+            text = "הצג רישיון והודעת זכויות"
+            isAllCaps = false
+            setOnClickListener { showLegalNotice() }
+        })
+    }
+
+    private fun showLegalNotice() {
+        val notice = runCatching {
+            assets.open("legal/legal_notice_he.txt").bufferedReader(Charsets.UTF_8).use { it.readText() }
+        }.getOrElse {
+            "הודעת הרישיון אינה זמינה בחבילה זו."
+        }
+        val content = TextView(this).apply {
+            text = notice
+            textSize = 14f
+            textDirection = View.TEXT_DIRECTION_RTL
+            gravity = Gravity.START
+            setTextIsSelectable(true)
+            setPadding(dp(22), dp(12), dp(22), dp(12))
+        }
+        AlertDialog.Builder(this)
+            .setTitle("JClock · רישיון וזכויות")
+            .setView(ScrollView(this).apply { addView(content) })
+            .setPositiveButton("סגור", null)
+            .show()
     }
 
     private fun showMusicState(state: MelodyPlayer.State) {
