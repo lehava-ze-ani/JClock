@@ -205,7 +205,8 @@ class ZeppLoopbackService : Service() {
             .put("utcOffsetSeconds", snapshot.utcOffsetSeconds)
             .put("mobileLocationEnabled", snapshot.mobileLocationEnabled)
             .put("updated", snapshot.updated)
-            .put("umid", getSharedPreferences("jclock-personal", MODE_PRIVATE).getString("umid", "") ?: "")
+            .put("keepScreenOn", getSharedPreferences("jclock-personal", MODE_PRIVATE)
+                .getBoolean("keep_watch_screen_on", false))
     }
 
     private fun receivePing(body: JSONObject): JSONObject {

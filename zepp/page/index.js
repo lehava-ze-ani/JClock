@@ -2,6 +2,7 @@ import { jclockSnapshot } from '../utils/jclock'
 import { requestPhoneLocation, sendSnapshot, sendMusicToggle, testPhoneConnection, SUN_TITLE, MOON_TITLE } from '../utils/bridge'
 import { createWidget, widget, align, prop, event } from '@zos/ui'
 import { getDeviceInfo } from '@zos/device'
+import { setPageBrightTime, resetPageBrightTime } from '@zos/display'
 
 const LATITUDE = 31.7768514
 const LONGITUDE = 35.2331664
@@ -83,9 +84,7 @@ function normalizedLocation(value) {
     timeZone: String((value && value.timeZone) || ''),
     mobileLocationEnabled: Boolean(value && value.mobileLocationEnabled),
     updated: !value || value.updated !== false
-    ,umid: /^[0-9A-F]{24}$/i.test(String(value && value.umid || '').trim())
-      ? String(value.umid).trim().toUpperCase()
-      : ''
+    ,keepScreenOn: Boolean(value && value.keepScreenOn)
   }
 }
 
@@ -121,6 +120,7 @@ Page({
     this.tapTimer = null
     this.statusTimer = null
     this.locationPollTimer = null
+    this.displayPreferenceTimer = null
     this.locationRequestInFlight = false
     this.locationGeneration = 0
     this.desiredLocationMode = 'jerusalem'
@@ -130,9 +130,6 @@ Page({
     this.timeZone = 'Asia/Jerusalem'
     this.utcOffsetMinutes = -new Date().getTimezoneOffset()
     this.mobileLocationEnabled = false
-    this.umid = ''
-    this.generalTextWidgets = []
-    this.generalFillWidgets = []
 
     let defaultOwner = null
     const make = (owner, type, params) => {
@@ -142,20 +139,14 @@ Page({
         : createWidget(type, params)
     }
 
-    const fill = (owner, x, y, w, h, color, radius = 0) => {
-      const result = make(owner, widget.FILL_RECT, { x, y, w, h, color, radius })
-      this.generalFillWidgets.push(result)
-      return result
-    }
+    const fill = (owner, x, y, w, h, color, radius = 0) => make(owner, widget.FILL_RECT, {
+      x, y, w, h, color, radius
+    })
 
-    const text = (owner, x, y, w, h, size, value, color = TEXT) => {
-      const result = make(owner, widget.TEXT, {
-        x, y, w, h, text: value, text_size: size, color,
-        align_h: align.CENTER_H, align_v: align.CENTER_V
-      })
-      this.generalTextWidgets.push(result)
-      return result
-    }
+    const text = (owner, x, y, w, h, size, value, color = TEXT) => make(owner, widget.TEXT, {
+      x, y, w, h, text: value, text_size: size, color,
+      align_h: align.CENTER_H, align_v: align.CENTER_V
+    })
 
     fill(null, 0, 0, width, height, BLACK)
     this.background = make(null, widget.IMG, {
@@ -299,6 +290,7 @@ Page({
     console.log('[JClock] B12 first refresh')
     this.timer = setInterval(() => this.safeRefresh(), 1000)
     this.refreshJerusalemContext()
+    this.displayPreferenceTimer = setInterval(() => this.refreshJerusalemContext(), LOCATION_POLL_MS)
     console.log('[JClock] B13 timer')
   },
 
@@ -408,7 +400,7 @@ Page({
         if (generation !== this.locationGeneration || this.locationMode !== 'jerusalem') return
         const location = normalizedLocation(value)
         if (!location) return
-        this.applyUmid(location.umid)
+        this.applyDisplayPreference(location.keepScreenOn)
         this.utcOffsetMinutes = location.utcOffsetMinutes
         this.timeZone = location.timeZone || 'Asia/Jerusalem'
         this.safeRefresh()
@@ -467,7 +459,7 @@ Page({
     this.utcOffsetMinutes = location.utcOffsetMinutes
     this.timeZone = location.timeZone || this.timeZone
     this.mobileLocationEnabled = location.mobileLocationEnabled
-    this.applyUmid(location.umid)
+    this.applyDisplayPreference(location.keepScreenOn)
     this.updateLocationLabel()
     this.safeRefresh()
   },
@@ -518,8 +510,8 @@ Page({
   },
 
   applyMoladButton(outer, inner, label, geometry, colors) {
-    const foreground = this.umid ? colorNumber(this.umid.slice(12, 18), BORDER) : colorNumber(colors && colors.foreground, BORDER)
-    const background = this.umid ? colorNumber(this.umid.slice(18, 24), PANEL) : colorNumber(colors && colors.background, PANEL)
+    const foreground = colorNumber(colors && colors.foreground, BORDER)
+    const background = colorNumber(colors && colors.background, PANEL)
     outer.setProperty(prop.MORE, {
       x: geometry.x,
       y: geometry.y,
@@ -548,16 +540,9 @@ Page({
     })
   },
 
-  applyUmid(value) {
-    const normalized = String(value || '').trim().toUpperCase()
-    if (!/^[0-9A-F]{24}$/.test(normalized) || normalized === this.umid) return
-    this.umid = normalized
-    const generalText = colorNumber(normalized.slice(0, 6), TEXT)
-    const generalBackground = colorNumber(normalized.slice(6, 12), BLACK)
-    this.generalFillWidgets.forEach(item => item.setProperty(prop.COLOR, generalBackground))
-    this.generalTextWidgets.forEach(item => item.setProperty(prop.COLOR, generalText))
-    if (this.background) this.background.setProperty(prop.VISIBLE, false)
-    this.safeRefresh()
+  applyDisplayPreference(keepScreenOn) {
+    if (keepScreenOn) setPageBrightTime({ brightTime: 2147483000 })
+    else resetPageBrightTime()
   },
 
   safeRefresh() {
@@ -654,6 +639,8 @@ Page({
     if (this.timer) clearInterval(this.timer)
     if (this.tapTimer) clearTimeout(this.tapTimer)
     if (this.statusTimer) clearTimeout(this.statusTimer)
+    if (this.displayPreferenceTimer) clearInterval(this.displayPreferenceTimer)
+    resetPageBrightTime()
     this.stopLocationPolling()
   }
 })

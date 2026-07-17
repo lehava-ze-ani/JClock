@@ -29,6 +29,7 @@ import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
+    private var contentRoot: View? = null
     private var enableMobileAfterPermission = false
     private val permission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         val allowed = PhoneLocationRepository.hasLocationPermission(this)
@@ -121,6 +122,15 @@ class MainActivity : ComponentActivity() {
         addLocationSection(layout)
         addMusicSection(layout)
         addUmidSection(layout)
+        layout.addView(Switch(this).apply {
+            text = "השאר את מסך השעון דולק"
+            textSize = 17f
+            isChecked = getSharedPreferences(PREFERENCES, MODE_PRIVATE).getBoolean(KEY_KEEP_WATCH_SCREEN_ON, false)
+            setOnCheckedChangeListener { _, enabled ->
+                getSharedPreferences(PREFERENCES, MODE_PRIVATE).edit()
+                    .putBoolean(KEY_KEEP_WATCH_SCREEN_ON, enabled).apply()
+            }
+        })
         addLegalSection(layout)
 
         layout.addView(Button(this).apply {
@@ -145,10 +155,13 @@ class MainActivity : ComponentActivity() {
                 }
             }
         })
-        setContentView(ScrollView(this).apply {
+        val scroll = ScrollView(this).apply {
             isFillViewport = true
             addView(layout)
-        })
+        }
+        contentRoot = scroll
+        applyUmidTheme(scroll)
+        setContentView(scroll)
         showMusicState(MelodyPlaybackController.state)
     }
 
@@ -269,6 +282,7 @@ class MainActivity : ComponentActivity() {
         val labels = listOf("שעת לבנה", "יום לבנה", "שעת חמה", "יום חמה")
         val swatches = labels.map { label ->
             TextView(this).apply {
+                tag = UMID_SWATCH_TAG
                 text = label
                 gravity = Gravity.CENTER
                 setPadding(dp(3), dp(12), dp(3), dp(12))
@@ -291,6 +305,7 @@ class MainActivity : ComponentActivity() {
                 view.setBackgroundColor(color)
                 view.setTextColor(contrastColor(color))
             }
+            if (valid) applyUmidTheme(contentRoot ?: parent)
         }
         input.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -379,6 +394,33 @@ class MainActivity : ComponentActivity() {
         return if (brightness >= 145) Color.BLACK else Color.WHITE
     }
 
+    private fun applyUmidTheme(root: View) {
+        val umid = getSharedPreferences(PREFERENCES, MODE_PRIVATE)
+            .getString(KEY_UMID, "")?.trim()?.uppercase().orEmpty()
+        if (!UMID_PATTERN.matches(umid)) return
+
+        val generalText = Color.parseColor("#${umid.substring(0, 6)}")
+        val generalBackground = Color.parseColor("#${umid.substring(6, 12)}")
+        val buttonText = Color.parseColor("#${umid.substring(12, 18)}")
+        val buttonBackground = Color.parseColor("#${umid.substring(18, 24)}")
+
+        fun style(view: View) {
+            if (view.tag == UMID_SWATCH_TAG) return
+            view.setBackgroundColor(generalBackground)
+            when (view) {
+                is Button -> {
+                    view.setBackgroundColor(buttonBackground)
+                    view.setTextColor(buttonText)
+                }
+                is TextView -> view.setTextColor(generalText)
+            }
+            if (view is android.view.ViewGroup) {
+                for (index in 0 until view.childCount) style(view.getChildAt(index))
+            }
+        }
+        style(root)
+    }
+
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun locationPermissions(): Array<String> = arrayOf(
@@ -389,6 +431,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         private const val PREFERENCES = "jclock-personal"
         private const val KEY_UMID = "umid"
+        private const val KEY_KEEP_WATCH_SCREEN_ON = "keep_watch_screen_on"
         private val UMID_PATTERN = Regex("[0-9A-F]{24}")
+        private const val UMID_SWATCH_TAG = "umid-swatch"
     }
 }
