@@ -136,7 +136,9 @@ class MainActivity : ComponentActivity() {
         layout.addView(Button(this).apply {
             text = "פתח יחידת לימוד"
             isAllCaps = false
-            setOnClickListener { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(birthUrl()))) }
+            setOnClickListener {
+                startActivity(JClockWebActivity.intent(this@MainActivity, birthUrl()))
+            }
         })
         layout.addView(Button(this).apply {
             text = "שתף קישור ב־WhatsApp"
@@ -320,7 +322,12 @@ class MainActivity : ComponentActivity() {
             text = "חשב והעתק UMID ב־BirthCalculator"
             isAllCaps = false
             setOnClickListener {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://birthcalculator.web.app")))
+                startActivity(
+                    JClockWebActivity.intent(
+                        this@MainActivity,
+                        "https://jclock.net/BirthCalculator/public/he/index.html",
+                    ),
+                )
             }
         })
     }
