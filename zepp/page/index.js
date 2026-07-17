@@ -1,5 +1,5 @@
 import { jclockSnapshot } from '../utils/jclock'
-import { requestPhoneLocation, sendSnapshot, sendMusicToggle, SUN_TITLE, MOON_TITLE } from '../utils/bridge'
+import { requestPhoneLocation, sendSnapshot, sendMusicToggle, testPhoneConnection, SUN_TITLE, MOON_TITLE } from '../utils/bridge'
 import { createWidget, widget, align, prop, event } from '@zos/ui'
 import { getDeviceInfo } from '@zos/device'
 
@@ -18,7 +18,7 @@ const GOLD = 0xf2ca45
 const GOLD_DARK = 0x5a4812
 const SUN = 0xffd342
 
-const WEEKDAYS = ['', 'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שבת']
+const WEEKDAYS = ['', 'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
 
 function pad(value, size) {
   let result = String(Math.trunc(Math.abs(Number(value) || 0)))
@@ -83,6 +83,9 @@ function normalizedLocation(value) {
     timeZone: String((value && value.timeZone) || ''),
     mobileLocationEnabled: Boolean(value && value.mobileLocationEnabled),
     updated: !value || value.updated !== false
+    ,umid: /^[0-9A-F]{24}$/i.test(String(value && value.umid || '').trim())
+      ? String(value.umid).trim().toUpperCase()
+      : ''
   }
 }
 
@@ -127,6 +130,9 @@ Page({
     this.timeZone = 'Asia/Jerusalem'
     this.utcOffsetMinutes = -new Date().getTimezoneOffset()
     this.mobileLocationEnabled = false
+    this.umid = ''
+    this.generalTextWidgets = []
+    this.generalFillWidgets = []
 
     let defaultOwner = null
     const make = (owner, type, params) => {
@@ -136,18 +142,20 @@ Page({
         : createWidget(type, params)
     }
 
-    const fill = (owner, x, y, w, h, color, radius = 0) => make(owner, widget.FILL_RECT, {
-      x, y, w, h, color, radius
-    })
+    const fill = (owner, x, y, w, h, color, radius = 0) => {
+      const result = make(owner, widget.FILL_RECT, { x, y, w, h, color, radius })
+      this.generalFillWidgets.push(result)
+      return result
+    }
 
-    const text = (owner, x, y, w, h, size, value, color = TEXT) => make(owner, widget.TEXT, {
-      x, y, w, h,
-      text: value,
-      text_size: size,
-      color,
-      align_h: align.CENTER_H,
-      align_v: align.CENTER_V
-    })
+    const text = (owner, x, y, w, h, size, value, color = TEXT) => {
+      const result = make(owner, widget.TEXT, {
+        x, y, w, h, text: value, text_size: size, color,
+        align_h: align.CENTER_H, align_v: align.CENTER_V
+      })
+      this.generalTextWidgets.push(result)
+      return result
+    }
 
     fill(null, 0, 0, width, height, BLACK)
     this.background = make(null, widget.IMG, {
@@ -254,6 +262,11 @@ Page({
 
     this.locationLabel = text(null, px(62), px(397), width - px(124), px(32), px(14), 'ירושלים · מיקום קבוע', GOLD)
     console.log('[JClock] B08 location mode')
+    this.syncButtonGeometry = { x: px(137), y: px(430), w: width - px(274), h: px(22) }
+    this.syncButtonOuter = fill(null, this.syncButtonGeometry.x, this.syncButtonGeometry.y, this.syncButtonGeometry.w, this.syncButtonGeometry.h, BORDER, px(7))
+    this.syncButtonInner = fill(null, this.syncButtonGeometry.x + px(2), this.syncButtonGeometry.y + px(2), this.syncButtonGeometry.w - px(4), this.syncButtonGeometry.h - px(4), PANEL, px(5))
+    this.syncButtonText = text(null, this.syncButtonGeometry.x, this.syncButtonGeometry.y, this.syncButtonGeometry.w, this.syncButtonGeometry.h, px(11), 'בדיקת חיבור')
+    this.syncButtonText.addEventListener(event.CLICK_UP, () => this.checkConnection())
 
     // Opening cover. The artwork stays text-free; exact Hebrew is drawn here so
     // spelling remains deterministic on every build.
@@ -346,6 +359,13 @@ Page({
     }).catch(() => {})
   },
 
+  checkConnection() {
+    this.setStatus('בודק חיבור…', GOLD)
+    testPhoneConnection()
+      .then(() => this.setStatus('✓ הטלפון והשעון מחוברים', 0x84c45e, 4000))
+      .catch(() => this.setStatus('אין חיבור לטלפון', 0xe05858, 4000))
+  },
+
   calculationContext(epoch) {
     if (this.locationMode === 'local') {
       const localDate = new Date(epoch)
@@ -388,6 +408,7 @@ Page({
         if (generation !== this.locationGeneration || this.locationMode !== 'jerusalem') return
         const location = normalizedLocation(value)
         if (!location) return
+        this.applyUmid(location.umid)
         this.utcOffsetMinutes = location.utcOffsetMinutes
         this.timeZone = location.timeZone || 'Asia/Jerusalem'
         this.safeRefresh()
@@ -446,6 +467,7 @@ Page({
     this.utcOffsetMinutes = location.utcOffsetMinutes
     this.timeZone = location.timeZone || this.timeZone
     this.mobileLocationEnabled = location.mobileLocationEnabled
+    this.applyUmid(location.umid)
     this.updateLocationLabel()
     this.safeRefresh()
   },
@@ -496,8 +518,8 @@ Page({
   },
 
   applyMoladButton(outer, inner, label, geometry, colors) {
-    const foreground = colorNumber(colors && colors.foreground, BORDER)
-    const background = colorNumber(colors && colors.background, PANEL)
+    const foreground = this.umid ? colorNumber(this.umid.slice(12, 18), BORDER) : colorNumber(colors && colors.foreground, BORDER)
+    const background = this.umid ? colorNumber(this.umid.slice(18, 24), PANEL) : colorNumber(colors && colors.background, PANEL)
     outer.setProperty(prop.MORE, {
       x: geometry.x,
       y: geometry.y,
@@ -524,6 +546,18 @@ Page({
       align_h: align.CENTER_H,
       align_v: align.CENTER_V
     })
+  },
+
+  applyUmid(value) {
+    const normalized = String(value || '').trim().toUpperCase()
+    if (!/^[0-9A-F]{24}$/.test(normalized) || normalized === this.umid) return
+    this.umid = normalized
+    const generalText = colorNumber(normalized.slice(0, 6), TEXT)
+    const generalBackground = colorNumber(normalized.slice(6, 12), BLACK)
+    this.generalFillWidgets.forEach(item => item.setProperty(prop.COLOR, generalBackground))
+    this.generalTextWidgets.forEach(item => item.setProperty(prop.COLOR, generalText))
+    if (this.background) this.background.setProperty(prop.VISIBLE, false)
+    this.safeRefresh()
   },
 
   safeRefresh() {

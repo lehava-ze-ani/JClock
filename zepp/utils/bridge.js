@@ -1,6 +1,7 @@
 const METHOD_SEND_SNAPSHOT = 'jclock.snapshot'
 const METHOD_TOGGLE_MUSIC = 'jclock.music.toggle'
 const METHOD_GET_LOCATION = 'jclock.location.get'
+const METHOD_PING = 'jclock.ping'
 const LOCATION_PROTOCOL = 'jclock.location.v1'
 const LOCATION_MODES = ['fixed', 'mobile', 'jerusalem']
 
@@ -146,4 +147,12 @@ export function requestPhoneLocation(mode = 'fixed') {
       requestedAt
     }
   })
+}
+
+export function testPhoneConnection() {
+  const messaging = getMessaging()
+  if (!messaging || typeof messaging.request !== 'function') {
+    return Promise.reject(new Error('Zepp messaging is not ready'))
+  }
+  return messaging.request({ method: METHOD_PING, params: { requestedAt: Date.now() } })
 }

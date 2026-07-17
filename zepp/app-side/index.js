@@ -3,9 +3,11 @@ import { BaseSideService, settingsLib } from '@zeppos/zml/base-side'
 const METHOD_SEND_SNAPSHOT = 'jclock.snapshot'
 const METHOD_TOGGLE_MUSIC = 'jclock.music.toggle'
 const METHOD_GET_LOCATION = 'jclock.location.get'
+const METHOD_PING = 'jclock.ping'
 const SNAPSHOT_ENDPOINT = 'http://127.0.0.1:43777/jclock/zepp/snapshot'
 const MUSIC_ENDPOINT = 'http://127.0.0.1:43777/jclock/zepp/music-toggle'
 const LOCATION_ENDPOINT = 'http://127.0.0.1:43777/jclock/zepp/location'
+const PING_ENDPOINT = 'http://127.0.0.1:43777/jclock/zepp/ping'
 const LOCATION_PROTOCOL = 'jclock.location.v1'
 const LOCATION_MODES = ['fixed', 'mobile', 'jerusalem']
 const LOCATION_TIMEOUT_MS = 16000
@@ -211,6 +213,21 @@ AppSideService(
     },
 
     onRequest(request, respond) {
+      if (request && request.method === METHOD_PING) {
+        this.fetch({
+          url: PING_ENDPOINT,
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ protocol: 'jclock.ping.v1', requestedAt: Date.now() }),
+          timeout: 8000
+        }).then((response) => {
+          if (!responseSucceeded(response)) throw new Error('Phone did not accept connection test')
+          return parseResponseBody(response)
+        }).then((result) => respond(null, result))
+          .catch((error) => respond({ code: 'PING_FAILED', message: error && error.message ? error.message : 'Connection test failed' }))
+        return
+      }
+
       if (request && request.method === METHOD_GET_LOCATION) {
         const payload = request.params
         if (!isLocationRequest(payload)) {

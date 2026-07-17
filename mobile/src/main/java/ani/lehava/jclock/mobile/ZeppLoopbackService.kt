@@ -146,6 +146,7 @@ class ZeppLoopbackService : Service() {
             SNAPSHOT_PATH -> receiveSnapshot(body)
             MUSIC_PATH -> receiveMusicToggle(body)
             LOCATION_PATH -> receiveLocation(body)
+            PING_PATH -> receivePing(body)
             else -> throw HttpFailure(404, "unknown endpoint")
         }
     }
@@ -204,6 +205,25 @@ class ZeppLoopbackService : Service() {
             .put("utcOffsetSeconds", snapshot.utcOffsetSeconds)
             .put("mobileLocationEnabled", snapshot.mobileLocationEnabled)
             .put("updated", snapshot.updated)
+            .put("umid", getSharedPreferences("jclock-personal", MODE_PRIVATE).getString("umid", "") ?: "")
+    }
+
+    private fun receivePing(body: JSONObject): JSONObject {
+        if (body.optString("protocol") != PING_PROTOCOL) throw HttpFailure(422, "invalid ping protocol")
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannel(
+            NotificationChannel(PING_NOTIFICATION_CHANNEL, "JClock connection tests", NotificationManager.IMPORTANCE_HIGH),
+        )
+        manager.notify(
+            PING_NOTIFICATION_ID,
+            Notification.Builder(this, PING_NOTIFICATION_CHANNEL)
+                .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle("JClock מחובר")
+                .setContentText("הטלפון והשעון מתקשרים בהצלחה")
+                .setAutoCancel(true)
+                .build(),
+        )
+        return JSONObject().put("ok", true).put("connected", true).put("receivedAt", System.currentTimeMillis())
     }
 
     private fun normalizeSnapshot(source: JSONObject): JSONObject {
@@ -385,9 +405,13 @@ class ZeppLoopbackService : Service() {
         private const val SNAPSHOT_PATH = "/jclock/zepp/snapshot"
         private const val MUSIC_PATH = "/jclock/zepp/music-toggle"
         private const val LOCATION_PATH = "/jclock/zepp/location"
+        private const val PING_PATH = "/jclock/zepp/ping"
         private const val SNAPSHOT_PROTOCOL = "jclock.snapshot.v1"
         private const val MUSIC_PROTOCOL = "jclock.music.toggle.v1"
         private const val LOCATION_PROTOCOL = "jclock.location.v1"
+        private const val PING_PROTOCOL = "jclock.ping.v1"
+        private const val PING_NOTIFICATION_CHANNEL = "jclock_connection_tests"
+        private const val PING_NOTIFICATION_ID = 43778
         private const val NOTIFICATION_CHANNEL = "jclock_zepp_connection"
         private const val NOTIFICATION_ID = 4_377
         private const val MAX_REQUEST_LINE_BYTES = 2_048
