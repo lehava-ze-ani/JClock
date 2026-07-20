@@ -1,3 +1,5 @@
+require('module-alias/register')
+
 const { initVariable } = require('../node_modules/@zeppos/zeus-cli/utils/pre-check')
 const { bridge } = require('../node_modules/@zeppos/zeus-cli/modules/bridge')
 

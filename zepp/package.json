@@ -7,6 +7,7 @@
   },
   "scripts": {
     "patch:zml": "node tools/patch-zml-api2.cjs",
+    "verify:garmin": "node tools/verify-garmin-port.cjs",
     "build": "npm run patch:zml && zeus build",
     "preview": "zeus preview",
     "dev": "zeus dev"

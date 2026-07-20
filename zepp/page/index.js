@@ -1,11 +1,11 @@
-import { jclockSnapshot } from '../utils/jclock'
+import { jclockSnapshot, israelUtcOffsetHours } from '../utils/jclock'
 import { requestPhoneLocation, sendSnapshot, sendMusicToggle, testPhoneConnection, SUN_TITLE, MOON_TITLE } from '../utils/bridge'
 import { createWidget, widget, align, prop, event } from '@zos/ui'
 import { getDeviceInfo } from '@zos/device'
 import { setPageBrightTime, resetPageBrightTime } from '@zos/display'
 
-const LATITUDE = 31.7768514
-const LONGITUDE = 35.2331664
+const LATITUDE = 31.776852
+const LONGITUDE = 35.233166
 const DOUBLE_TAP_MS = 430
 const LOCATION_POLL_MS = 6000
 
@@ -14,10 +14,11 @@ const PANEL = 0x121416
 const BORDER = 0x3a4148
 const ORBIT_BORDER = 0x59636d
 const TEXT = 0xd4d8dc
-const MUTED = 0x9199a2
+const MUTED = 0xaaaaaa
 const GOLD = 0xf2ca45
 const GOLD_DARK = 0x5a4812
 const SUN = 0xffd342
+const GARMIN_MIDA_COLORS = [0x0000ff, 0xff0000, 0x800080, 0x00ff00, 0xffff00, 0xffa500, 0xaaaaaa]
 
 const WEEKDAYS = ['', 'ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת']
 
@@ -32,6 +33,10 @@ function colorNumber(value, fallback) {
   const normalized = String(value || '').replace('#', '')
   const parsed = parseInt(normalized, 16)
   return Number.isFinite(parsed) ? parsed : fallback
+}
+
+function garminMidaColor(number) {
+  return GARMIN_MIDA_COLORS[Math.max(1, Math.min(7, Number(number) || 7)) - 1]
 }
 
 function clamp(value, low, high) {
@@ -104,12 +109,9 @@ function sourcePosition(source, center, radius) {
 
 Page({
   build() {
-    console.log('[JClock] B00 build start')
     const { width, height } = getDeviceInfo()
-    console.log(`[JClock] B01 device ${width}x${height}`)
     const scale = Math.min(width, height) / 454
     const px = value => Math.round(value * scale)
-    const centerX = Math.round(width / 2)
 
     this.width = width
     this.height = height
@@ -128,173 +130,74 @@ Page({
     this.latitude = LATITUDE
     this.longitude = LONGITUDE
     this.timeZone = 'Asia/Jerusalem'
-    this.utcOffsetMinutes = -new Date().getTimezoneOffset()
+    this.utcOffsetMinutes = israelUtcOffsetHours(Date.now()) * 60
     this.mobileLocationEnabled = false
+    this.sourceSwitchStartedAt = Date.now()
 
-    let defaultOwner = null
-    const make = (owner, type, params) => {
-      const targetOwner = owner === null ? defaultOwner : owner
-      return targetOwner
-        ? targetOwner.createWidget(type, params)
-        : createWidget(type, params)
-    }
-
-    const fill = (owner, x, y, w, h, color, radius = 0) => make(owner, widget.FILL_RECT, {
-      x, y, w, h, color, radius
-    })
-
-    const text = (owner, x, y, w, h, size, value, color = TEXT) => make(owner, widget.TEXT, {
+    const text = (x, y, w, h, size, value, color = MUTED) => createWidget(widget.TEXT, {
       x, y, w, h, text: value, text_size: size, color,
       align_h: align.CENTER_H, align_v: align.CENTER_V
     })
 
-    fill(null, 0, 0, width, height, BLACK)
-    this.background = make(null, widget.IMG, {
-      x: 0,
-      y: 0,
-      w: width,
-      h: height,
-      src: 'cover-yellow-black.png',
-      auto_scale: true,
-      auto_scale_obj_fit: true
+    this.background = createWidget(widget.FILL_RECT, { x: 0, y: 0, w: width, h: height, color: BLACK })
+
+    // Large round-screen layout: each row nearly fills the safe circular width.
+    const rowHeight = px(74)
+    const rowY = percent => Math.round(height * percent - rowHeight / 2)
+    const dateCellW = Math.round(width * 0.24)
+    const dateCell = center => Math.round(width * center - dateCellW / 2)
+    this.gregorianDay = text(dateCell(0.35), rowY(0.12), dateCellW, rowHeight, px(50), '--')
+    this.gregorianSeparator = text(dateCell(0.50), rowY(0.12), dateCellW, rowHeight, px(50), '/')
+    this.gregorianMonth = text(dateCell(0.65), rowY(0.12), dateCellW, rowHeight, px(50), '--')
+    this.civil = text(px(24), rowY(0.29), width - px(48), rowHeight, px(58), '--:--:--')
+    this.centerDivider = createWidget(widget.FILL_RECT, {
+      x: 0, y: Math.round(height / 2), w: width, h: Math.max(2, px(2)), color: 0xffffff
     })
-    // If a later widget or calculation fails, this remains visible and proves
-    // that the page itself started instead of leaving an indistinguishable black screen.
-    this.bootLabel = text(null, px(55), px(190), width - px(110), px(74), px(25), 'JClock 0.3.8\nטוען…', GOLD)
-    this.mainLayer = createWidget(widget.GROUP, { x: 0, y: 0, w: width, h: height })
-    defaultOwner = this.mainLayer
-    console.log('[JClock] B02 boot label')
+    this.mazalLabel = text(px(18), rowY(0.60), width - px(36), rowHeight, px(48), '--')
 
-    // Top: solar source-clock line.
-    text(null, centerX - px(52), px(18), px(104), px(24), px(17), 'חמה', GOLD)
-    const rowX = px(61)
-    const rowW = width - rowX * 2
-    const rowH = px(64)
-    fill(null, rowX, px(41), rowW, rowH, BORDER, px(8))
-    fill(null, rowX + px(2), px(43), rowW - px(4), rowH - px(4), PANEL, px(6))
-    this.sunTime = text(null, rowX, px(43), rowW, px(45), px(38), '--:----:--')
-    this.sunMazal = text(null, rowX + px(8), px(86), rowW - px(16), px(16), px(13), '--', MUTED)
-    console.log('[JClock] B03 solar row')
+    const clockY = rowY(0.78)
+    const clockSize = px(52)
+    this.sunHour = text(Math.round(width * 0.15), clockY, Math.round(width * 0.22), rowHeight, clockSize, '--')
+    this.sunSeparator1 = text(Math.round(width * 0.32), clockY, Math.round(width * 0.08), rowHeight, clockSize, ':')
+    this.sunMinute = text(Math.round(width * 0.36), clockY, Math.round(width * 0.28), rowHeight, clockSize, '----')
+    this.sunSeparator2 = text(Math.round(width * 0.62), clockY, Math.round(width * 0.08), rowHeight, clockSize, ':')
+    this.sunSecond = text(Math.round(width * 0.67), clockY, Math.round(width * 0.18), rowHeight, clockSize, '--')
 
-    // Critical molad-color buttons. The left one receives Jerusalem sun colors;
-    // the right one receives Jerusalem moon colors, exactly like the local source.
-    const sideY = px(151)
-    const sideW = px(70)
-    const sideH = px(126)
-    this.leftButtonGeometry = { x: px(16), y: sideY, w: sideW, h: sideH }
-    this.rightButtonGeometry = { x: width - px(16) - sideW, y: sideY, w: sideW, h: sideH }
-    this.leftButtonOuter = fill(null, this.leftButtonGeometry.x, sideY, sideW, sideH, BORDER, px(9))
-    this.leftButtonInner = fill(null, this.leftButtonGeometry.x + px(3), sideY + px(3), sideW - px(6), sideH - px(6), PANEL, px(7))
-    this.leftButtonText = text(null, this.leftButtonGeometry.x, sideY, sideW, sideH, px(16), 'מקומי')
-    this.rightButtonOuter = fill(null, this.rightButtonGeometry.x, sideY, sideW, sideH, BORDER, px(9))
-    this.rightButtonInner = fill(null, this.rightButtonGeometry.x + px(3), sideY + px(3), sideW - px(6), sideH - px(6), PANEL, px(7))
-    this.rightButtonText = text(null, this.rightButtonGeometry.x, sideY, sideW, sideH, px(14), 'ירושלים')
-    this.leftButtonText.addEventListener(event.CLICK_UP, () => this.selectLocalLocation())
-    this.rightButtonText.addEventListener(event.CLICK_UP, () => this.selectJerusalem())
-    console.log('[JClock] B04 side buttons')
+    // Preserve the existing single/double-tap behavior without adding visible chrome.
+    const tapTargets = [
+      this.background,
+      this.gregorianDay,
+      this.gregorianSeparator,
+      this.gregorianMonth,
+      this.civil,
+      this.centerDivider,
+      this.mazalLabel,
+      this.sunHour,
+      this.sunSeparator1,
+      this.sunMinute,
+      this.sunSeparator2,
+      this.sunSecond
+    ]
+    tapTargets.forEach(target => target.addEventListener(event.CLICK_UP, () => this.onClockTap()))
 
-    // Center orbit. Right is east/rise, left is west/set.
-    const groupSize = px(218)
-    this.orbitGroupSize = groupSize
-    this.orbitCenter = Math.round(groupSize / 2)
-    this.orbitRadius = px(82)
-    this.orbitGroup = createWidget(widget.GROUP, {
-      x: centerX - Math.round(groupSize / 2),
-      y: px(107),
-      w: groupSize,
-      h: groupSize
-    })
-    console.log('[JClock] B05 orbit group')
-    make(this.orbitGroup, widget.CIRCLE, {
-      center_x: this.orbitCenter,
-      center_y: this.orbitCenter,
-      radius: px(91),
-      color: ORBIT_BORDER
-    })
-    make(this.orbitGroup, widget.CIRCLE, {
-      center_x: this.orbitCenter,
-      center_y: this.orbitCenter,
-      radius: px(89),
-      color: PANEL
-    })
-    this.weekday = text(this.orbitGroup, px(45), px(65), px(128), px(22), px(13), '--', MUTED)
-    this.date = text(this.orbitGroup, px(30), px(88), px(158), px(34), px(22), '--', TEXT)
-    this.civil = text(this.orbitGroup, px(47), px(121), px(124), px(24), px(16), '--:--:--', TEXT)
-    this.status = text(this.orbitGroup, px(25), px(146), px(168), px(25), px(13), 'נגיעה: נגן · כפולה: שליחה', MUTED)
-
-    this.sunDot = make(this.orbitGroup, widget.CIRCLE, {
-      center_x: this.orbitCenter,
-      center_y: this.orbitCenter - this.orbitRadius,
-      radius: px(9),
-      color: SUN
-    })
-    this.moonImage = make(this.orbitGroup, widget.IMG, {
-      x: this.orbitCenter - px(16),
-      y: this.orbitCenter - this.orbitRadius - px(16),
-      w: px(32),
-      h: px(32),
-      src: 'moon/moon_30_01.png',
-      auto_scale: true,
-      auto_scale_obj_fit: true
-    })
-    this.orbitGroup.addEventListener(event.CLICK_UP, () => this.onClockTap())
-    console.log('[JClock] B06 orbit content')
-
-    text(null, px(112), px(284), px(70), px(18), px(11), 'מערב', MUTED)
-    text(null, width - px(182), px(284), px(70), px(18), px(11), 'מזרח', MUTED)
-
-    // Bottom: lunar source-clock line.
-    text(null, centerX - px(52), px(299), px(104), px(23), px(17), 'לבנה', GOLD)
-    fill(null, rowX, px(321), rowW, rowH, BORDER, px(8))
-    fill(null, rowX + px(2), px(323), rowW - px(4), rowH - px(4), PANEL, px(6))
-    this.moonTime = text(null, rowX, px(323), rowW, px(45), px(38), '--:----:--')
-    this.moonMazal = text(null, rowX + px(8), px(366), rowW - px(16), px(16), px(13), '--', MUTED)
-    console.log('[JClock] B07 lunar row')
-
-    this.locationLabel = text(null, px(62), px(397), width - px(124), px(32), px(14), 'ירושלים · מיקום קבוע', GOLD)
-    console.log('[JClock] B08 location mode')
-    this.syncButtonGeometry = { x: px(137), y: px(430), w: width - px(274), h: px(22) }
-    this.syncButtonOuter = fill(null, this.syncButtonGeometry.x, this.syncButtonGeometry.y, this.syncButtonGeometry.w, this.syncButtonGeometry.h, BORDER, px(7))
-    this.syncButtonInner = fill(null, this.syncButtonGeometry.x + px(2), this.syncButtonGeometry.y + px(2), this.syncButtonGeometry.w - px(4), this.syncButtonGeometry.h - px(4), PANEL, px(5))
-    this.syncButtonText = text(null, this.syncButtonGeometry.x, this.syncButtonGeometry.y, this.syncButtonGeometry.w, this.syncButtonGeometry.h, px(11), 'בדיקת חיבור')
-    this.syncButtonText.addEventListener(event.CLICK_UP, () => this.checkConnection())
-
-    // Opening cover. The artwork stays text-free; exact Hebrew is drawn here so
-    // spelling remains deterministic on every build.
-    this.cover = createWidget(widget.GROUP, { x: 0, y: 0, w: width, h: height })
-    console.log('[JClock] B09 cover group')
-    console.log('[JClock] B10 shared background')
-    text(this.cover, px(64), px(80), width - px(128), px(42), px(30), 'JClock', GOLD)
-    text(this.cover, px(60), px(133), width - px(120), px(30), px(21), 'שעון חמה:', GOLD)
-    text(this.cover, px(48), px(161), width - px(96), px(62), px(20), 'מה צריך להיות באמת\nיעד המשימה?', TEXT)
-    fill(this.cover, px(105), px(232), width - px(210), px(2), GOLD_DARK)
-    text(this.cover, px(60), px(244), width - px(120), px(30), px(21), 'שעון הלבנה:', GOLD)
-    text(this.cover, px(48), px(272), width - px(96), px(62), px(20), 'מה גרם לנו לעצור\nאת השעון?', TEXT)
-    this.coverStatus = text(this.cover, px(70), px(368), width - px(140), px(28), px(15), 'נגיעה לפתיחת השעון', GOLD)
-    this.coverError = text(this.cover, px(42), px(397), width - px(84), px(24), px(11), '', 0xe05858)
-    text(this.cover, px(48), px(426), width - px(96), px(16), px(10), '© 2009–2026 נפתלי ביליג', MUTED)
-    this.mainLayer.setProperty(prop.VISIBLE, false)
-    this.orbitGroup.setProperty(prop.VISIBLE, false)
-    this.cover.addEventListener(event.CLICK_UP, () => {
-      this.cover.setProperty(prop.VISIBLE, false)
-      this.mainLayer.setProperty(prop.VISIBLE, true)
-      this.orbitGroup.setProperty(prop.VISIBLE, true)
-    })
-    this.bootLabel.setProperty(prop.VISIBLE, false)
-    console.log('[JClock] B11 cover complete')
-
-    // Build the cover before the first dynamic calculation. If a calculation
-    // fails on a particular firmware, the user still sees a usable diagnostic
-    // screen instead of the black background.
     this.safeRefresh()
-    console.log('[JClock] B12 first refresh')
     this.timer = setInterval(() => this.safeRefresh(), 1000)
     this.refreshJerusalemContext()
     this.displayPreferenceTimer = setInterval(() => this.refreshJerusalemContext(), LOCATION_POLL_MS)
-    console.log('[JClock] B13 timer')
   },
 
   setStatus(value, color = MUTED, clearAfter = 0) {
+    if (!this.status && this.mazalLabel) {
+      this.mazalLabel.setProperty(prop.MORE, { text: value, color })
+      if (this.statusTimer) clearTimeout(this.statusTimer)
+      if (clearAfter) {
+        this.statusTimer = setTimeout(() => {
+          this.statusTimer = null
+          this.safeRefresh()
+        }, clearAfter)
+      }
+      return
+    }
     if (!this.status) return
     this.status.setProperty(prop.MORE, {
       x: this.px(25),
@@ -323,8 +226,14 @@ Page({
       this.tapTimer = null
       const selectedEpoch = this.pausedEpoch || this.firstTapAt
       this.firstTapAt = 0
-      this.pausedEpoch = 0
       this.sendStoppedTime(selectedEpoch)
+      this.safeRefresh()
+      return
+    }
+
+    if (this.pausedEpoch) {
+      this.pausedEpoch = 0
+      this.firstTapAt = 0
       this.safeRefresh()
       return
     }
@@ -332,13 +241,9 @@ Page({
     this.firstTapAt = now
     this.pausedEpoch = now
     this.safeRefresh()
-    this.setStatus('ממתין ללחיצה שנייה…', GOLD)
     this.tapTimer = setTimeout(() => {
       this.tapTimer = null
       this.firstTapAt = 0
-      this.pausedEpoch = 0
-      this.togglePhoneMusic()
-      this.safeRefresh()
     }, DOUBLE_TAP_MS)
   },
 
@@ -367,8 +272,8 @@ Page({
       }
     }
     return {
-      parts: zonedParts(epoch, this.utcOffsetMinutes),
-      offsetMinutes: this.utcOffsetMinutes
+      parts: zonedParts(epoch, israelUtcOffsetHours(epoch) * 60),
+      offsetMinutes: israelUtcOffsetHours(epoch) * 60
     }
   },
 
@@ -401,7 +306,7 @@ Page({
         const location = normalizedLocation(value)
         if (!location) return
         this.applyDisplayPreference(location.keepScreenOn)
-        this.utcOffsetMinutes = location.utcOffsetMinutes
+        this.utcOffsetMinutes = israelUtcOffsetHours(Date.now()) * 60
         this.timeZone = location.timeZone || 'Asia/Jerusalem'
         this.safeRefresh()
       })
@@ -550,18 +455,13 @@ Page({
       this.refresh()
       return true
     } catch (error) {
-      this.setStatus('שגיאת תצוגה · פתח מחדש', 0xe05858)
-      if (this.coverStatus) this.coverStatus.setProperty(prop.TEXT, 'שגיאת חישוב')
-      if (this.coverError) {
-        const message = error && error.message ? error.message : String(error || 'unknown')
-        this.coverError.setProperty(prop.TEXT, message.slice(0, 48))
-      }
+      if (this.mazalLabel) this.mazalLabel.setProperty(prop.TEXT, 'שגיאת חישוב')
       return false
     }
   },
 
   refresh() {
-    if (!this.sunTime) return
+    if (!this.sunHour) return
     const epoch = this.pausedEpoch || Date.now()
     const context = this.calculationContext(epoch)
     const snapshot = jclockSnapshot(
@@ -572,67 +472,47 @@ Page({
     )
     this.snapshot = snapshot
 
-    this.sunTime.setProperty(prop.TEXT, snapshot.sun.value)
-    this.moonTime.setProperty(prop.TEXT, snapshot.moon ? snapshot.moon.value : '--:----:--')
-    this.date.setProperty(prop.TEXT, snapshot.hebrew.formatted)
-    this.weekday.setProperty(prop.TEXT, `יום ${WEEKDAYS[snapshot.hebrew.weekday] || ''}`)
+    const showMoon = Boolean(snapshot.moon) && Math.floor((Date.now() - this.sourceSwitchStartedAt) / 6000) % 2 === 1
+    const source = showMoon ? snapshot.moon : snapshot.sun
+    const molad = showMoon ? snapshot.molad.moon : snapshot.molad.sun
+
+    this.gregorianDay.setProperty(prop.MORE, {
+      text: pad(context.parts.day, 2),
+      color: garminMidaColor(molad.foregroundMida)
+    })
+    this.gregorianSeparator.setProperty(prop.COLOR, MUTED)
+    this.gregorianMonth.setProperty(prop.MORE, {
+      text: pad(context.parts.month, 2),
+      color: garminMidaColor(molad.backgroundMida)
+    })
     this.civil.setProperty(prop.TEXT, civilTimeFromParts(context.parts))
-    this.sunMazal.setProperty(prop.MORE, {
-      x: this.px(69),
-      y: this.px(86),
-      w: this.width - this.px(138),
-      h: this.px(16),
-      text: `יום ${snapshot.sun.dayMazalName} · שעה ${snapshot.sun.mazalName}`,
-      text_size: this.px(13),
-      color: colorNumber(snapshot.sun.mazalColor, MUTED),
-      align_h: align.CENTER_H,
-      align_v: align.CENTER_V
-    })
-    this.moonMazal.setProperty(prop.MORE, {
-      x: this.px(69),
-      y: this.px(366),
-      w: this.width - this.px(138),
-      h: this.px(16),
-      text: snapshot.moon ? `יום ${snapshot.moon.dayMazalName} · שעה ${snapshot.moon.mazalName}` : '--',
-      text_size: this.px(13),
-      color: snapshot.moon ? colorNumber(snapshot.moon.mazalColor, MUTED) : MUTED,
-      align_h: align.CENTER_H,
-      align_v: align.CENTER_V
+    this.mazalLabel.setProperty(prop.MORE, {
+      text: showMoon ? snapshot.hebrew.hebrewText : (source.mazalName || snapshot.hebrew.hebrewText),
+      color: showMoon
+        ? (source.risingPeriod ? 0xffffff : MUTED)
+        : MUTED
     })
 
-    const sun = sourcePosition(snapshot.sun, this.orbitCenter, this.orbitRadius)
-    const moon = sourcePosition(snapshot.moon, this.orbitCenter, this.orbitRadius)
-    this.sunDot.setProperty(prop.MORE, {
-      center_x: sun.x,
-      center_y: sun.y,
-      radius: this.px(9),
-      color: SUN
-    })
-    this.moonImage.setProperty(prop.MORE, {
-      x: moon.x - this.px(16),
-      y: moon.y - this.px(16),
-      w: this.px(32),
-      h: this.px(32),
-      src: moonAsset(snapshot),
-      auto_scale: true,
-      auto_scale_obj_fit: true
-    })
+    const parts = String(source.value || '--:----:--').split(':')
+    this.sunHour.setProperty(prop.TEXT, parts[0] || '--')
+    this.sunMinute.setProperty(prop.TEXT, parts[1] || '----')
+    this.sunSecond.setProperty(prop.TEXT, parts[2] || '--')
 
-    this.applyMoladButton(
-      this.leftButtonOuter,
-      this.leftButtonInner,
-      this.leftButtonText,
-      this.leftButtonGeometry,
-      snapshot.molad.sun
-    )
-    this.applyMoladButton(
-      this.rightButtonOuter,
-      this.rightButtonInner,
-      this.rightButtonText,
-      this.rightButtonGeometry,
-      snapshot.molad.moon
-    )
-    this.updateLocationLabel()
+    if (showMoon) {
+      const moonColor = garminMidaColor(source.mazal && source.mazal.midaNumber)
+      this.sunHour.setProperty(prop.COLOR, moonColor)
+      this.sunMinute.setProperty(prop.COLOR, moonColor)
+      this.sunSecond.setProperty(prop.COLOR, moonColor)
+      this.sunSeparator1.setProperty(prop.COLOR, moonColor)
+      this.sunSeparator2.setProperty(prop.COLOR, moonColor)
+    } else {
+      const colors = source.garminColors
+      this.sunHour.setProperty(prop.COLOR, colors.hour)
+      this.sunMinute.setProperty(prop.COLOR, colors.minute)
+      this.sunSecond.setProperty(prop.COLOR, colors.second)
+      this.sunSeparator1.setProperty(prop.COLOR, colors.separator)
+      this.sunSeparator2.setProperty(prop.COLOR, colors.separator)
+    }
   },
 
   onDestroy() {

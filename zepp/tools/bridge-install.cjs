@@ -21,7 +21,7 @@ function write(chunk, stream) {
     setTimeout(() => child.stdin.write('connect\n'), 1500)
     setTimeout(() => {
       installSent = true
-      child.stdin.write('install -t cheetah-round\n')
+      child.stdin.write('install -t "Amazfit Cheetah (Round)"\n')
     }, 5000)
   }
 }

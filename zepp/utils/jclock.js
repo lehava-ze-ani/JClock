@@ -5,8 +5,20 @@
 // deliberately unusual source-clock units: 1080 parts per hour and 76 moments
 // per part.
 
-export const JERUSALEM_LATITUDE = 31.7768514
-export const JERUSALEM_LONGITUDE = 35.2331664
+// Exact Jerusalem anchor used by HebrewClock13_Garmin/MenuTestView.mc.
+export const JERUSALEM_LATITUDE = 31.776852
+export const JERUSALEM_LONGITUDE = 35.233166
+
+export const GARMIN_COLORS = {
+  blue: 0x0000ff,
+  red: 0xff0000,
+  purple: 0x800080,
+  green: 0x00ff00,
+  yellow: 0xffff00,
+  orange: 0xffa500,
+  lightGray: 0xaaaaaa,
+  white: 0xffffff
+}
 
 const PI = Math.PI
 const RAD = PI / 180
@@ -105,6 +117,26 @@ function defaultOffsetHours(date, supplied) {
   return date instanceof Date ? -date.getTimezoneOffset() / 60 : 3
 }
 
+function lastSundayUtc(year, month) {
+  const lastDay = month === 2
+    ? (isGregorianLeapYear(year) ? 29 : 28)
+    : ([4, 6, 9, 11].indexOf(month) >= 0 ? 30 : 31)
+  const value = new Date(Date.UTC(year, month - 1, lastDay, 0, 0, 0))
+  value.setUTCDate(value.getUTCDate() - value.getUTCDay())
+  return value.getTime()
+}
+
+// Literal port of MenuTestView.getIsraelTimeZone(): DST begins two days before
+// the last Sunday in March and ends one hour before the last Sunday in October.
+export function israelUtcOffsetHours(epoch = Date.now()) {
+  const timestamp = epoch instanceof Date ? epoch.getTime() : Number(epoch)
+  const israelStandard = new Date(timestamp + 2 * 60 * 60 * 1000)
+  const year = israelStandard.getUTCFullYear()
+  const dstStart = lastSundayUtc(year, 3) - 2 * 24 * 60 * 60 * 1000
+  const dstEnd = lastSundayUtc(year, 10) - 60 * 60 * 1000
+  return timestamp >= dstStart && timestamp < dstEnd ? 3 : 2
+}
+
 function isGregorianLeapYear(year) {
   return year % 400 === 0 || (year % 100 !== 0 && year % 4 === 0)
 }
@@ -147,7 +179,8 @@ export function addCivilDays(date, days) {
 
 function currentHourFloat(value) {
   const current = currentParts(value)
-  return current.hour + current.minute / 60 + current.second / 3600 + current.millisecond / 3600000
+  // Garmin hebrewclock() deliberately ignores milliseconds.
+  return current.hour + current.minute / 60 + current.second / 3600
 }
 
 // Same suntime() algorithm and constants as public/jclock/js/SunTime.js.
@@ -388,7 +421,58 @@ export function calculateSunClock(
     todaySun.set,
     tomorrowSun.set
   )
-  return applyMazalFields(time, displayHebrewDayFromSource(current, todaySun.set, true), 0)
+  applyMazalFields(time, displayHebrewDayFromSource(current, todaySun.set, true), 0)
+  time.garminColors = garminSunClockColors(current, latitude, longitude, offset)
+  return time
+}
+
+// Exact formula from MenuTestView.calculateAsrAngle().
+export function calculateGarminAsrAngle(date, latitude = JERUSALEM_LATITUDE) {
+  const declinationValue = 23.44 * Math.sin(RAD * ((360 / 365) * (dayOfYear(date) - 81)))
+  const thetaNoon = 90 - Math.abs(Number(latitude) - declinationValue)
+  const initialShadow = 1 / Math.tan(RAD * thetaNoon)
+  return Math.atan(1 / (1 + initialShadow)) / RAD
+}
+
+// Direct port of doit()/MarkTime() color thresholds. The unusual use of
+// tomorrow's 108-degree dawn for fajar is intentional: it is what Garmin does.
+export function garminSunClockColors(
+  date,
+  latitude = JERUSALEM_LATITUDE,
+  longitude = JERUSALEM_LONGITUDE,
+  offsetHours
+) {
+  const current = currentParts(date)
+  const offset = defaultOffsetHours(date, offsetHours)
+  const tomorrow = addCivilDays(current, 1)
+  const now = currentHourFloat(current)
+  const standard = sunTimes(current, latitude, longitude, 90 + 50 / 60, offset)
+  const misheyakir = sunTimes(current, latitude, longitude, 101, offset).rise
+  const tzeit = sunTimes(current, latitude, longitude, 96, offset).set
+  const fajar = sunTimes(tomorrow, latitude, longitude, 108, offset).rise
+  const asrZenith = 90 - calculateGarminAsrAngle(current, latitude)
+  const atzer = sunTimes(current, latitude, longitude, asrZenith, offset).set
+  const isha = sunTimes(current, latitude, longitude, 108, offset).set
+
+  let second = GARMIN_COLORS.lightGray
+  if (now > fajar && now < atzer) second = GARMIN_COLORS.green
+  if (now > atzer && now < isha) second = GARMIN_COLORS.yellow
+
+  return {
+    hour: now > misheyakir && now <= tzeit ? GARMIN_COLORS.blue : GARMIN_COLORS.lightGray,
+    minute: now > standard.set || now < standard.rise ? GARMIN_COLORS.lightGray : GARMIN_COLORS.red,
+    second,
+    separator: GARMIN_COLORS.lightGray,
+    thresholds: {
+      sunrise: standard.rise,
+      sunset: standard.set,
+      misheyakir,
+      tzeit,
+      fajar,
+      atzer,
+      isha
+    }
+  }
 }
 
 function julianFromLocalMidnight(date, offsetHours) {
@@ -475,6 +559,11 @@ export function moonTimes(
     h0 = h2
   }
 
+  // SunCalc.mc lines 139-150 wrap events found in the 24..26 hour scan
+  // back into the civil day before hebrewclock() consumes them.
+  if (rise !== undefined && rise >= 24) rise -= 24
+  if (set !== undefined && set >= 24) set -= 24
+
   return {
     rise,
     set,
@@ -528,7 +617,7 @@ export function calculateMoonClock(
     tomorrowMoon.set
   )
   const moonDisplayDay = displayHebrewDayFromSource(current, todayMoon.set, true)
-  const sourceManDay = displayHebrewDayFromSource(current, sunTime.set, false)
+  const sourceManDay = displayHebrewDayFromSource(current, sunTime.set, true)
   const mazalDayOffset = calculateMoonMazalDayOffset(time, sunTime, moonDisplayDay, sourceManDay)
   applyMazalFields(time, moonDisplayDay, mazalDayOffset)
   return { valid: true, time, times: todayMoon }
@@ -555,7 +644,9 @@ export function normalizeHebrewTime(value) {
 export function formatHebrewTime(value) {
   const normalized = normalizeHebrewTime(value)
   if (!normalized) return '--:----:--'
-  return `${pad(normalized.hour, 2)}:${pad(normalized.minute, 4)}:${pad(normalized.second, 2)}`
+  // MenuTestView.display_time() displays lbHour % 12 while retaining the
+  // original 0..23 value internally for mazal and JColor calculations.
+  return `${pad(normalized.hour % 12, 2)}:${pad(normalized.minute, 4)}:${pad(normalized.second, 2)}`
 }
 
 export function solarClock(date, latitude = JERUSALEM_LATITUDE, longitude = JERUSALEM_LONGITUDE, offsetHours) {
@@ -825,8 +916,18 @@ export function calculateHebrewDisplayDate(
   const offset = defaultOffsetHours(date, offsetHours)
   const tzeitTimes = sunTimes(current, latitude, longitude, 96, offset)
   const afterTzeit = currentHourFloat(current) > tzeitTimes.set
-  const sourceCivilDate = afterTzeit ? addCivilDays(current, 1) : civilOnly(current)
+  const sourceCivilDate = civilOnly(current)
   const sourceDate = hebrewDateFromCivil(sourceCivilDate)
+  // HebrewClock13_Garmin.hebrewDateFunc() advances only the displayed day
+  // after tzeit, and wraps 31 to 1 without changing its stored month.
+  if (afterTzeit) {
+    sourceDate.day += 1
+    sourceDate.date = sourceDate.day
+    if (sourceDate.day === 31) {
+      sourceDate.day = 1
+      sourceDate.date = 1
+    }
+  }
   const displayYear = sourceDate.year - 3760
   const result = {
     day: sourceDate.day,
@@ -844,7 +945,22 @@ export function calculateHebrewDisplayDate(
     afterTzeit
   }
   result.formatted = `${pad(result.day, 2)}-${pad(result.month, 2)}-${pad(result.displayYear, 4)}`
+  result.hebrewText = `${hebrewDayText(result.day)} ב${hebrewMonthHebrew(sourceDate.month)}`
   return result
+}
+
+function hebrewDayText(day) {
+  const values = [
+    '', "א'", "ב'", "ג'", "ד'", "ה'", "ו'", "ז'", "ח'", "ט'", "י'",
+    'י"א', 'י"ב', 'י"ג', 'י"ד', 'ט"ו', 'ט"ז', 'י"ז', 'י"ח', 'י"ט', "כ'",
+    'כ"א', 'כ"ב', 'כ"ג', 'כ"ד', 'כ"ה', 'כ"ו', 'כ"ז', 'כ"ח', 'כ"ט', "ל'"
+  ]
+  return values[Number(day)] || ''
+}
+
+function hebrewMonthHebrew(month) {
+  const values = ['', 'תשרי', 'חשוון', 'כסלו', 'טבת', 'שבט', 'אדר', 'אדר ב', 'ניסן', 'אייר', 'סיוון', 'תמוז', 'אב', 'אלול']
+  return values[Number(month)] || ''
 }
 
 export function moonPhaseForHebrewDate(day, monthLength) {
@@ -942,6 +1058,24 @@ function moladMonthForPeriod(hebrew, periodKey) {
   return buildMoladMonth(hebrew.year, monthName)
 }
 
+// Garmin JColor treats day 30 as the first Rosh Chodesh day and uses the
+// coming month's molad. Day 1 already belongs to that month.
+function jColorDateForRoshChodesh(hebrew) {
+  if (Number(hebrew.day) !== 30) return hebrew
+  const months = hebrewMonthKeysForYear(hebrew.year)
+  const current = canonicalMoladMonthKey(hebrew.monthName || hebrew.month_name)
+  const index = months.indexOf(current)
+  if (index >= 0 && index < months.length - 1) {
+    const monthName = months[index + 1]
+    return Object.assign({}, hebrew, { monthName, month_name: monthName })
+  }
+  return Object.assign({}, hebrew, {
+    year: Number(hebrew.year) + 1,
+    monthName: 'tishri',
+    month_name: 'tishri'
+  })
+}
+
 function buildMoladInfoForMonth(moladMonth) {
   const monthOffset = getMonthOffsetFromTishrei(moladMonth.year, moladMonth.monthKey)
   const monthsElapsed = monthsBeforeTishrei(moladMonth.year) + monthOffset
@@ -990,7 +1124,8 @@ export function moladButtonColors(date, offsetHours) {
   const offset = defaultOffsetHours(date, offsetHours)
   const sun = calculateSunClock(date, JERUSALEM_LATITUDE, JERUSALEM_LONGITUDE, offset)
   const moonClock = calculateMoonClock(date, sun, JERUSALEM_LATITUDE, JERUSALEM_LONGITUDE, offset)
-  const hebrew = hebrewDateFromCivil(civilOnly(date)) // no tzeit rollover for colors
+  const displayed = calculateHebrewDisplayDate(date, JERUSALEM_LATITUDE, JERUSALEM_LONGITUDE, offset)
+  const hebrew = jColorDateForRoshChodesh(displayed.sourceDate)
   const sunColors = moladColorsForSourceTime(sun, hebrew)
   const moonColors = moonClock.valid ? moladColorsForSourceTime(moonClock.time, hebrew) : sunColors
   return {
